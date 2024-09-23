@@ -39,7 +39,7 @@ udpSocket.on("message", (data: Buffer, remoteAddr: dgram.RemoteInfo) => {
   try {
     console.log(`Received data from ${remoteAddr.address}:${remoteAddr.port}`);
 
-    const header = Header.write(defaultHeader);
+    const header = Header.write({ ...defaultHeader, qdcount: 1 });
     const question = Question.write(defaultQuestion);
 
     const response = Buffer.concat([header, question]);
