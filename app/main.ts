@@ -9,6 +9,7 @@ import Question, {
   QuestionClass,
   QuestionType,
 } from "./sections/QuestionSection";
+import Answer, { INDSAnswer } from "./sections/AnswerSection";
 
 const defaultHeader: IDNSHeader = {
   id: 1234,
@@ -32,6 +33,14 @@ const defaultQuestion: IDNSQuestion = {
   classCode: QuestionClass.IN,
 };
 
+const defaultAnswer: INDSAnswer = {
+  name: "codecrafters.io",
+  type: 1,
+  classCode: 1,
+  ttl: 60,
+  rdlength: 4,
+};
+
 const udpSocket: dgram.Socket = dgram.createSocket("udp4");
 udpSocket.bind(2053, "127.0.0.1");
 
@@ -39,10 +48,11 @@ udpSocket.on("message", (data: Buffer, remoteAddr: dgram.RemoteInfo) => {
   try {
     console.log(`Received data from ${remoteAddr.address}:${remoteAddr.port}`);
 
-    const header = Header.write({ ...defaultHeader, qdcount: 1 });
+    const header = Header.write({ ...defaultHeader, qdcount: 1, ancount: 1 });
     const question = Question.write(defaultQuestion);
+    const answer = Answer.write(defaultAnswer);
 
-    const response = Buffer.concat([header, question]);
+    const response = Buffer.concat([header, question, answer]);
 
     udpSocket.send(response, remoteAddr.port, remoteAddr.address);
   } catch (e) {
