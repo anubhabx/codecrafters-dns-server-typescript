@@ -1,36 +1,35 @@
 import * as dgram from "dgram";
-import {
-  encode,
+import Header, {
   IDNSHeader,
-  IDNSPacket,
   OPCODE,
+  ResponseCode,
+} from "./sections/HeaderSection";
+import Question, {
+  IDNSQuestion,
   QuestionClass,
   QuestionType,
-  RCODE,
-} from "./encode";
+} from "./sections/QuestionSection";
 
-const packet: IDNSPacket = {
-  header: {
-    id: 1234,
-    qr: 1,
-    opcode: OPCODE.QUERY,
-    aa: 0,
-    tc: 0,
-    rd: 0,
-    ra: 0,
-    z: 0,
-    rcode: RCODE.NO_ERROR,
-    qdcount: 1,
-    ancount: 0,
-    nscount: 0,
-    arcount: 0,
-  },
+const defaultHeader: IDNSHeader = {
+  id: 1234,
+  qr: 1,
+  opcode: OPCODE.QUERY,
+  aa: 0,
+  tc: 0,
+  rd: 0,
+  ra: 0,
+  z: 0,
+  rcode: ResponseCode.NO_ERROR_CONDITION,
+  qdcount: 0,
+  ancount: 0,
+  nscount: 0,
+  arcount: 0,
+};
 
-  question: {
-    name: "codecrafters.io",
-    type: QuestionType.A,
-    class: QuestionClass.IN,
-  },
+const defaultQuestion: IDNSQuestion = {
+  name: "codecrafters.io",
+  type: QuestionType.A,
+  classCode: QuestionClass.IN,
 };
 
 const udpSocket: dgram.Socket = dgram.createSocket("udp4");
@@ -40,7 +39,10 @@ udpSocket.on("message", (data: Buffer, remoteAddr: dgram.RemoteInfo) => {
   try {
     console.log(`Received data from ${remoteAddr.address}:${remoteAddr.port}`);
 
-    const response = encode(packet);
+    const header = Header.write(defaultHeader);
+    const question = Question.write(defaultQuestion);
+
+    const response = Buffer.concat([header, question]);
 
     udpSocket.send(response, remoteAddr.port, remoteAddr.address);
   } catch (e) {
