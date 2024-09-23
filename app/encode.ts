@@ -72,15 +72,16 @@ export function encode(packet: IDNSPacket): Buffer {
   const { header, question } = packet;
 
   const domainLabels = question.name.split(".");
+  if (domainLabels.length < 2) {
+    throw new Error("Invalid domain name");
+  }
 
   const domain = domainLabels[0];
   const tld = domainLabels[1];
 
   // Size Allocation
-
   const HEADER_LENGTH = 12;
   const QUESTION_LENGTH = 1 + domain.length + 1 + tld.length + 4;
-
   const TOTAL_LENGTH = HEADER_LENGTH + QUESTION_LENGTH;
 
   const buffer = Buffer.alloc(TOTAL_LENGTH);
@@ -88,8 +89,7 @@ export function encode(packet: IDNSPacket): Buffer {
   let offset = 0;
 
   // Header Section
-
-  buffer.writeInt16BE(header.id);
+  buffer.writeInt16BE(header.id, offset);
   offset += 2;
 
   const flags =
@@ -105,30 +105,29 @@ export function encode(packet: IDNSPacket): Buffer {
   buffer.writeInt16BE(flags, offset);
   offset += 2;
 
-  buffer.writeInt16BE(header.qdcount);
+  buffer.writeInt16BE(header.qdcount, offset);
   offset += 2;
 
-  buffer.writeInt16BE(header.ancount);
+  buffer.writeInt16BE(header.ancount, offset);
   offset += 2;
 
-  buffer.writeInt16BE(header.nscount);
+  buffer.writeInt16BE(header.nscount, offset);
   offset += 2;
 
-  buffer.writeInt16BE(header.arcount);
+  buffer.writeInt16BE(header.arcount, offset);
   offset += 2;
 
-  // Question Section\
-
+  // Question Section
   buffer.writeInt8(domain.length, offset);
   offset += 1;
 
-  buffer.write(domain, offset);
+  buffer.write(domain, offset, "utf8");
   offset += domain.length;
 
   buffer.writeInt8(tld.length, offset);
   offset += 1;
 
-  buffer.write(tld, offset);
+  buffer.write(tld, offset, "utf8");
   offset += tld.length;
 
   buffer.writeInt8(0x0, offset);
