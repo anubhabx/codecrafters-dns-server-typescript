@@ -20,7 +20,7 @@ const packet: IDNSPacket = {
     ra: 0,
     z: 0,
     rcode: RCODE.NO_ERROR,
-    qdcount: 0,
+    qdcount: 1,
     ancount: 0,
     nscount: 0,
     arcount: 0,
