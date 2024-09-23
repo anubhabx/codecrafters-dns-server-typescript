@@ -47,7 +47,15 @@ class Header {
 
     const { qr, opcode, aa, tc, rd, ra, z, rcode } = values;
 
-    const flags = qr | opcode | aa | tc | rd | ra | z | rcode;
+    const flags =
+      (qr << 15) |
+      (opcode << 11) |
+      (aa << 10) |
+      (tc << 9) |
+      (rd << 8) |
+      (ra << 7) |
+      (z << 4) |
+      rcode;
 
     header.writeInt16BE(flags, 2);
     header.writeInt16BE(values.qdcount, 4);
