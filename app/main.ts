@@ -39,6 +39,7 @@ const defaultAnswer: INDSAnswer = {
   classCode: 1,
   ttl: 60,
   rdlength: 4,
+  rdata: "8.8.8.8",
 };
 
 const udpSocket: dgram.Socket = dgram.createSocket("udp4");
