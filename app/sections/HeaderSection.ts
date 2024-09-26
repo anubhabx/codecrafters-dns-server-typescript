@@ -2,6 +2,7 @@ export enum OPCODE {
   QUERY = 0,
   IQUERY = 1,
   STATUS = 2,
+  NOT_IMPLEMENTED = 3,
 }
 
 export enum ResponseCode {
@@ -35,7 +36,9 @@ class Header {
 
     header.writeInt16BE(values.id);
 
-    const { qr, opcode, aa, tc, rd, ra, z, rcode } = values;
+    let { qr, opcode, aa, tc, rd, ra, z, rcode } = values;
+
+    opcode = opcode === OPCODE.QUERY ? opcode : OPCODE.NOT_IMPLEMENTED;
 
     const flags =
       (qr << 15) |
@@ -54,6 +57,43 @@ class Header {
     header.writeInt16BE(values.arcount, 10);
 
     return header;
+  }
+
+  static read(data: Buffer): IDNSHeader {
+    const id = data.readUInt16BE(0);
+    const flags = data.readUInt16BE(2);
+    const qdcount = data.readUInt16BE(4);
+    const ancount = data.readUInt16BE(6);
+    const nscount = data.readUInt16BE(8);
+    const arcount = data.readUInt16BE(10);
+
+    const qr = flags >> 15;
+    const opcode = flags >> 11 && 0b1111;
+    const aa = flags >> 10 && 1;
+    const tc = flags >> 9 && 1;
+    const rd = flags >> 8 && 1;
+    const ra = flags >> 7 && 1;
+    const z = flags >> 4 && 0b111;
+    const rcode = flags && 0b1111;
+
+    return {
+      id,
+      qr,
+      opcode: opcode as OPCODE,
+      aa,
+      tc,
+      rd,
+      ra,
+      z,
+      rcode:
+        opcode === 0
+          ? ResponseCode.NO_ERROR_CONDITION
+          : ResponseCode.NOT_IMPLEMENTED,
+      qdcount,
+      ancount,
+      nscount,
+      arcount,
+    };
   }
 }
 

@@ -11,21 +11,21 @@ import Question, {
 } from "./sections/QuestionSection";
 import Answer, { INDSAnswer } from "./sections/AnswerSection";
 
-const defaultHeader: IDNSHeader = {
-  id: 1234,
-  qr: 1,
-  opcode: OPCODE.QUERY,
-  aa: 0,
-  tc: 0,
-  rd: 0,
-  ra: 0,
-  z: 0,
-  rcode: ResponseCode.NO_ERROR_CONDITION,
-  qdcount: 0,
-  ancount: 0,
-  nscount: 0,
-  arcount: 0,
-};
+// const defaultHeader: IDNSHeader = {
+//   id: 1234,
+//   qr: 1,
+//   opcode: OPCODE.QUERY,
+//   aa: 0,
+//   tc: 0,
+//   rd: 0,
+//   ra: 0,
+//   z: 0,
+//   rcode: ResponseCode.NO_ERROR_CONDITION,
+//   qdcount: 0,
+//   ancount: 0,
+//   nscount: 0,
+//   arcount: 0,
+// };
 
 const defaultQuestion: IDNSQuestion = {
   name: "codecrafters.io",
@@ -49,7 +49,9 @@ udpSocket.on("message", (data: Buffer, remoteAddr: dgram.RemoteInfo) => {
   try {
     console.log(`Received data from ${remoteAddr.address}:${remoteAddr.port}`);
 
-    const header = Header.write({ ...defaultHeader, qdcount: 1, ancount: 1 });
+    const parsedHeader = Header.read(data);
+
+    const header = Header.write(parsedHeader);
     const question = Question.write(defaultQuestion);
     const answer = Answer.write(defaultAnswer);
 
