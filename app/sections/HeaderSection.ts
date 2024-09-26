@@ -67,14 +67,14 @@ class Header {
     const nscount = data.readUInt16BE(8);
     const arcount = data.readUInt16BE(10);
 
-    const qr = flags >> 15 && 1;
-    const opcode = flags >> 11 && 0b1111;
-    const aa = flags >> 10 && 1;
-    const tc = flags >> 9 && 1;
-    const rd = flags >> 8 && 1;
-    const ra = flags >> 7 && 1;
-    const z = flags >> 4 && 0b111;
-    const rcode = flags && 0b1111;
+    const qr = (flags >> 15) & 1;
+    const opcode = (flags >> 11) & 0b1111;
+    const aa = (flags >> 10) & 1;
+    const tc = (flags >> 9) & 1;
+    const rd = (flags >> 8) & 1;
+    const ra = (flags >> 7) & 1;
+    const z = (flags >> 4) & 0b111;
+    const rcode = flags & 0b1111;
 
     return {
       id,
