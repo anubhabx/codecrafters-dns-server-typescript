@@ -60,12 +60,12 @@ class Header {
   }
 
   static read(data: Buffer): IDNSHeader {
-    const id = data.readUInt16BE(0);
-    const flags = data.readUInt16BE(2);
-    const qdcount = data.readUInt16BE(4);
-    const ancount = data.readUInt16BE(6);
-    const nscount = data.readUInt16BE(8);
-    const arcount = data.readUInt16BE(10);
+    const id = data.readInt16BE(0);
+    const flags = data.readInt16BE(2);
+    const qdcount = data.readInt16BE(4);
+    const ancount = data.readInt16BE(6);
+    const nscount = data.readInt16BE(8);
+    const arcount = data.readInt16BE(10);
 
     const qr = (flags >> 15) & 1;
     const opcode = (flags >> 11) & 0b1111;
