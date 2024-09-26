@@ -38,7 +38,7 @@ class Header {
 
     let { qr, opcode, aa, tc, rd, ra, z, rcode } = values;
 
-    opcode = opcode === OPCODE.QUERY ? opcode : OPCODE.NOT_IMPLEMENTED;
+    opcode = opcode === OPCODE.QUERY ? OPCODE.QUERY : OPCODE.NOT_IMPLEMENTED;
 
     const flags =
       (qr << 15) |
