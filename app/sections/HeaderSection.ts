@@ -6,7 +6,7 @@ export enum OPCODE {
 }
 
 export enum ResponseCode {
-  NO_ERROR_CONDITION = 0,
+  NOERROR = 0,
   FORMAT_ERROR = 1,
   SERVER_FAILURE = 2,
   NAME_ERROR = 3,
@@ -67,7 +67,7 @@ class Header {
     const nscount = data.readUInt16BE(8);
     const arcount = data.readUInt16BE(10);
 
-    const qr = flags >> 15;
+    const qr = flags >> 15 && 1;
     const opcode = flags >> 11 && 0b1111;
     const aa = flags >> 10 && 1;
     const tc = flags >> 9 && 1;
@@ -85,10 +85,7 @@ class Header {
       rd,
       ra,
       z,
-      rcode:
-        opcode === 0
-          ? ResponseCode.NO_ERROR_CONDITION
-          : ResponseCode.NOT_IMPLEMENTED,
+      rcode: opcode === 0 ? ResponseCode.NOERROR : ResponseCode.NOT_IMPLEMENTED,
       qdcount,
       ancount,
       nscount,
