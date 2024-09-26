@@ -51,7 +51,14 @@ udpSocket.on("message", (data: Buffer, remoteAddr: dgram.RemoteInfo) => {
 
     const parsedHeader = Header.read(data);
 
-    const header = Header.write(parsedHeader);
+    const header = Header.write({
+      ...parsedHeader,
+      qr: 1,
+      aa: 0,
+      tc: 0,
+      ra: 0,
+      z: 0,
+    });
     const question = Question.write(defaultQuestion);
     const answer = Answer.write(defaultAnswer);
 
