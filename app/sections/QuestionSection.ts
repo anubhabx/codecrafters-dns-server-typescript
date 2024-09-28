@@ -64,27 +64,21 @@ class Question {
     return question;
   }
 
-  static read(data: Buffer): IDNSQuestion {
-    let domainName: string = "";
+  static decode(data: Buffer): string {
     let offset: number = 0;
+    let parts: string[] = [];
 
-    // Concat the string until there is a null character.
     while (data[offset] !== 0) {
-      domainName += String.fromCharCode(data[offset]);
+      const length = data[offset];
       offset++;
+
+      const part = data.subarray(offset, offset + length).toString("binary");
+      parts.push(part);
+
+      offset += length;
     }
 
-    // Skip the null character
-    offset++;
-
-    const type = data.readInt16BE(offset);
-    const classCode = data.readInt16BE(offset + 2);
-
-    return {
-      name: domainName,
-      type,
-      classCode,
-    };
+    return parts.join(".");
   }
 }
 
