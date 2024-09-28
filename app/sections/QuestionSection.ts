@@ -50,7 +50,7 @@ class Question {
     typeBuffer.writeUInt16BE(type);
 
     const classBuffer = Buffer.alloc(2);
-    typeBuffer.writeUInt16BE(classCode);
+    classBuffer.writeUInt16BE(classCode);
 
     const question = Buffer.concat([
       nameBuffer,

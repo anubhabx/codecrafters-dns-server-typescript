@@ -75,6 +75,7 @@ udpSocket.on("message", (data: Buffer, remoteAddr: dgram.RemoteInfo) => {
     });
 
     console.log("Question: ", question);
+    console.log({ "Question String:": question.toString() });
 
     const answer = Answer.write({
       name: domainName,
@@ -84,6 +85,9 @@ udpSocket.on("message", (data: Buffer, remoteAddr: dgram.RemoteInfo) => {
       rdlength: 4,
       rdata: "8.8.8.8",
     });
+
+    console.log("Answer: ", answer);
+    console.log({ "Answer String:": answer.toString() });
 
     const response = Buffer.concat([header, question, answer]);
 

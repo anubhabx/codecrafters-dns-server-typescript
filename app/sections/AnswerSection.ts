@@ -19,6 +19,7 @@ class Answer {
     );
 
     const nullByte = Buffer.from([0]);
+    
     const typeBuffer = Buffer.alloc(2);
     typeBuffer.writeUInt16BE(values.type);
 
