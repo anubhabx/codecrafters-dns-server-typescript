@@ -34,20 +34,32 @@ class Question {
   static write(values: IDNSQuestion) {
     const { name, type, classCode } = values;
 
-    const str = name
-      .split(".")
-      .map((n) => `${String.fromCharCode(n.length)}${n}`)
-      .join("");
+    const labels = name.split(".");
 
-    const typeAndClass = Buffer.alloc(4);
+    const nameBuffer = Buffer.concat(
+      labels.map((label) => {
+        const length = Buffer.from([label.length]);
+        const labelBuffer = Buffer.from(label, "binary");
 
-    typeAndClass.writeInt16BE(type);
-    typeAndClass.writeInt16BE(classCode, 2);
+        return Buffer.concat([length, labelBuffer]);
+      })
+    );
+
+    const nullByte = Buffer.from([0]);
+    const typeBuffer = Buffer.alloc(2);
+    typeBuffer.writeUInt16BE(type);
+
+    const classBuffer = Buffer.alloc(2);
+    typeBuffer.writeUInt16BE(classCode);
 
     const question = Buffer.concat([
-      Buffer.from(str + "\0", "binary"),
-      typeAndClass,
+      nameBuffer,
+      nullByte,
+      typeBuffer,
+      classBuffer,
     ]);
+
+    console.log("Question Size: ", question.byteLength);
 
     return question;
   }

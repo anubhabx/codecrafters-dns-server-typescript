@@ -34,7 +34,7 @@ class Header {
   static write(values: IDNSHeader) {
     let header = Buffer.alloc(12);
 
-    header.writeInt16BE(values.id);
+    header.writeUInt16BE(values.id);
 
     let { qr, opcode, aa, tc, rd, ra, z, rcode } = values;
 
@@ -48,22 +48,24 @@ class Header {
       (z << 4) |
       rcode;
 
-    header.writeInt16BE(flags, 2);
-    header.writeInt16BE(values.qdcount, 4);
-    header.writeInt16BE(values.ancount, 6);
-    header.writeInt16BE(values.nscount, 8);
-    header.writeInt16BE(values.arcount, 10);
+    header.writeUInt16BE(flags, 2);
+    header.writeUInt16BE(values.qdcount, 4);
+    header.writeUInt16BE(values.ancount, 6);
+    header.writeUInt16BE(values.nscount, 8);
+    header.writeUInt16BE(values.arcount, 10);
+
+    console.log("Header size: ", header.byteLength);
 
     return header;
   }
 
   static read(data: Buffer): IDNSHeader {
-    const id = data.readInt16BE(0);
-    const flags = data.readInt16BE(2);
-    const qdcount = data.readInt16BE(4);
-    const ancount = data.readInt16BE(6);
-    const nscount = data.readInt16BE(8);
-    const arcount = data.readInt16BE(10);
+    const id = data.readUInt16BE(0);
+    const flags = data.readUInt16BE(2);
+    const qdcount = data.readUInt16BE(4);
+    const ancount = data.readUInt16BE(6);
+    const nscount = data.readUInt16BE(8);
+    const arcount = data.readUInt16BE(10);
 
     const qr = (flags >> 15) & 1;
     const opcode = (flags >> 11) & 0b1111;

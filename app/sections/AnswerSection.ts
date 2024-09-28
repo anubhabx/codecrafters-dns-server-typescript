@@ -4,28 +4,50 @@ export interface INDSAnswer {
   classCode: number;
   ttl: number;
   rdlength: number;
-  rdata?: any;
+  rdata: string;
 }
 
 class Answer {
   static write(values: INDSAnswer) {
-    const str = values.name
-      .split(".")
-      .map((n) => `${String.fromCharCode(n.length)}${n}`)
-      .join("");
+    const labels = values.name.split(".");
+    const nameBuffer = Buffer.concat(
+      labels.map((label) => {
+        const length = Buffer.from([label.length]);
+        const labelBuffer = Buffer.from(label, "binary");
+        return Buffer.concat([length, labelBuffer]);
+      })
+    );
 
-    const data = Buffer.alloc(10 + (values.rdata ? values.rdata.length : 0));
+    const nullByte = Buffer.from([0]);
+    const typeBuffer = Buffer.alloc(2);
+    typeBuffer.writeUInt16BE(values.type);
 
-    data.writeInt16BE(values.type);
-    data.writeInt16BE(values.classCode, 2);
-    data.writeInt32BE(values.ttl, 4);
-    data.writeInt16BE(values.rdlength, 8);
+    const classBuffer = Buffer.alloc(2);
+    classBuffer.writeUInt16BE(values.classCode);
 
-    if (values.rdata) {
-      data.write(values.rdata, 10);
-    }
+    const ttlBuffer = Buffer.alloc(4);
+    classBuffer.writeUInt16BE(values.ttl);
 
-    const answer = Buffer.concat([Buffer.from(str + "\0", "binary"), data]);
+    const lengthBuffer = Buffer.alloc(2);
+    classBuffer.writeUInt16BE(values.rdlength);
+
+    const rdataBuffer = Buffer.from(
+      values.rdata.split(".").map((octet) => parseInt(octet, 10))
+    );
+
+    console.log("RDATA: ", rdataBuffer.byteLength);
+
+    const answer = Buffer.concat([
+      nameBuffer,
+      nullByte,
+      typeBuffer,
+      classBuffer,
+      ttlBuffer,
+      lengthBuffer,
+      rdataBuffer,
+    ]);
+
+    console.log("Answer Size: ", answer.byteLength);
 
     return answer;
   }

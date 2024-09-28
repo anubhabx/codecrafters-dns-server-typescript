@@ -50,14 +50,9 @@ udpSocket.on("message", (data: Buffer, remoteAddr: dgram.RemoteInfo) => {
     console.log(`Received data from ${remoteAddr.address}:${remoteAddr.port}`);
 
     const parsedHeader = Header.read(data);
-    let domainName: string = "";
-    let offset: number = 12;
-
-    while (data[offset] !== 0) {
-      domainName += String.fromCharCode(data[offset]);
-    }
 
     // console.log("Parsed Header: ", parsedHeader);
+    const domainName = Question.decode(data.subarray(12, data.length));
 
     const header = Header.write({
       ...parsedHeader,
@@ -92,7 +87,13 @@ udpSocket.on("message", (data: Buffer, remoteAddr: dgram.RemoteInfo) => {
 
     const response = Buffer.concat([header, question, answer]);
 
-    udpSocket.send(response, remoteAddr.port, remoteAddr.address);
+    udpSocket.send(response, remoteAddr.port, remoteAddr.address, (err) => {
+      if (err) {
+        console.log("Failed to send response: ", err);
+      } else {
+        console.log("Response sent successfully.");
+      }
+    });
   } catch (e) {
     console.log(`Error sending data: ${e}`);
   }
