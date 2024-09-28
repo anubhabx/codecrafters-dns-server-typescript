@@ -51,6 +51,29 @@ class Question {
 
     return question;
   }
+
+  static read(data: Buffer): IDNSQuestion {
+    let domainName: string = "";
+    let offset: number = 0;
+
+    // Concat the string until there is a null character.
+    while (data[offset] !== 0) {
+      domainName += String.fromCharCode(data[offset]);
+      offset++;
+    }
+
+    // Skip the null character
+    offset++;
+
+    const type = data.readInt16BE(offset);
+    const classCode = data.readInt16BE(offset + 2);
+
+    return {
+      name: domainName,
+      type,
+      classCode,
+    };
+  }
 }
 
 export default Question;
