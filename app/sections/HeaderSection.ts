@@ -38,8 +38,6 @@ class Header {
 
     let { qr, opcode, aa, tc, rd, ra, z, rcode } = values;
 
-    opcode = opcode === OPCODE.QUERY ? OPCODE.QUERY : OPCODE.NOT_IMPLEMENTED;
-
     const flags =
       (qr << 15) |
       (opcode << 11) |
@@ -76,7 +74,7 @@ class Header {
     const z = (flags >> 4) & 0b111;
     const rcode = flags & 0b1111;
 
-    return {
+    const header = {
       id,
       qr,
       opcode: opcode as OPCODE,
@@ -86,11 +84,15 @@ class Header {
       ra,
       z,
       rcode: opcode === 0 ? ResponseCode.NOERROR : ResponseCode.NOT_IMPLEMENTED,
-      qdcount,
-      ancount,
-      nscount,
-      arcount,
+      qdcount: 1,
+      ancount: 1,
+      nscount: 0,
+      arcount: 0,
     };
+
+    // console.log("Header returned from Header.write(): ", header);
+
+    return header;
   }
 }
 

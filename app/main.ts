@@ -51,6 +51,8 @@ udpSocket.on("message", (data: Buffer, remoteAddr: dgram.RemoteInfo) => {
 
     const parsedHeader = Header.read(data);
 
+    // console.log("Parsed Header: ", parsedHeader);
+
     const header = Header.write({
       ...parsedHeader,
       qr: 1,
@@ -59,6 +61,10 @@ udpSocket.on("message", (data: Buffer, remoteAddr: dgram.RemoteInfo) => {
       ra: 0,
       z: 0,
     });
+
+    // console.log("Header written in main: ", header);
+    // console.log("Written header parsed: ", Header.read(header));
+
     const question = Question.write(defaultQuestion);
     const answer = Answer.write(defaultAnswer);
 
