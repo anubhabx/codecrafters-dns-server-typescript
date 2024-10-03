@@ -27,10 +27,10 @@ class Answer {
     classBuffer.writeUInt16BE(values.classCode);
 
     const ttlBuffer = Buffer.alloc(4);
-    classBuffer.writeUInt16BE(values.ttl);
+    ttlBuffer.writeUInt32BE(values.ttl);
 
     const lengthBuffer = Buffer.alloc(2);
-    classBuffer.writeUInt16BE(values.rdlength);
+    lengthBuffer.writeUInt16BE(values.rdlength);
 
     const rdataBuffer = Buffer.from(
       values.rdata.split(".").map((octet) => parseInt(octet, 10))

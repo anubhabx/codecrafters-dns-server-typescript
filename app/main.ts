@@ -11,37 +11,6 @@ import Question, {
 } from "./sections/QuestionSection";
 import Answer, { INDSAnswer } from "./sections/AnswerSection";
 
-// const defaultHeader: IDNSHeader = {
-//   id: 1234,
-//   qr: 1,
-//   opcode: OPCODE.QUERY,
-//   aa: 0,
-//   tc: 0,
-//   rd: 0,
-//   ra: 0,
-//   z: 0,
-//   rcode: ResponseCode.NO_ERROR_CONDITION,
-//   qdcount: 0,
-//   ancount: 0,
-//   nscount: 0,
-//   arcount: 0,
-// };
-
-// const defaultQuestion: IDNSQuestion = {
-//   name: "codecrafters.io",
-//   type: QuestionType.A,
-//   classCode: QuestionClass.IN,
-// };
-
-// const defaultAnswer: INDSAnswer = {
-//   name: "codecrafters.io",
-//   type: 1,
-//   classCode: 1,
-//   ttl: 60,
-//   rdlength: 4,
-//   rdata: "8.8.8.8",
-// };
-
 const udpSocket: dgram.Socket = dgram.createSocket("udp4");
 udpSocket.bind(2053, "127.0.0.1");
 
@@ -51,45 +20,71 @@ udpSocket.on("message", (data: Buffer, remoteAddr: dgram.RemoteInfo) => {
 
     const parsedHeader = Header.read(data);
 
-    // console.log("Parsed Header: ", parsedHeader);
-    const domainName = Question.decode(data.subarray(12, data.length));
-
-    const header = Header.write({
+    let responseHeader = {
       ...parsedHeader,
       qr: 1,
       aa: 0,
       tc: 0,
       ra: 0,
       z: 0,
-    });
+      rcode: ResponseCode.NOERROR,
+    };
 
-    // console.log("Header written in main: ", header);
-    // console.log("Written header parsed: ", Header.read(header));
+    // Handle IQUERY, STATUS, RESERVED, and unrecognized opcodes
+    if (parsedHeader.opcode === OPCODE.IQUERY || 
+        parsedHeader.opcode === OPCODE.STATUS || 
+        parsedHeader.opcode === OPCODE.RESERVED) {
+      responseHeader.rcode = ResponseCode.NOT_IMPLEMENTED;
+      responseHeader.ancount = 0;
+      responseHeader.qdcount = 0;
+      const header = Header.write(responseHeader);
+      udpSocket.send(header, remoteAddr.port, remoteAddr.address, (err) => {
+        if (err) {
+          console.log("Failed to send response: ", err);
+        } else {
+          console.log("Response sent successfully.");
+        }
+      });
+      return;
+    }
 
-    console.log("Domain Name: ", domainName);
+    let offset = 12; // DNS header is 12 bytes
+    const questions = [];
+    for (let i = 0; i < parsedHeader.qdcount; i++) {
+      const { name, byteLength } = Question.decode(data, offset);
+      const type = data.readUInt16BE(offset + byteLength - 4);
+      const classCode = data.readUInt16BE(offset + byteLength - 2);
+      questions.push({ name, type, classCode, byteLength });
+      offset += byteLength;
+    }
 
-    const question = Question.write({
-      name: domainName,
-      type: QuestionType.A,
-      classCode: QuestionClass.IN,
-    });
+    responseHeader.ancount = questions.length;
+    responseHeader.qdcount = questions.length;
 
-    console.log("Question: ", question);
-    console.log({ "Question String:": question.toString() });
+    const header = Header.write(responseHeader);
 
-    const answer = Answer.write({
-      name: domainName,
-      type: 1,
-      classCode: 1,
-      ttl: 60,
-      rdlength: 4,
-      rdata: "8.8.8.8",
-    });
+    console.log("Questions: ", questions);
 
-    console.log("Answer: ", answer);
-    console.log({ "Answer String:": answer.toString() });
+    const questionBuffers = questions.map((q) =>
+      Question.write({
+        name: q.name,
+        type: q.type,
+        classCode: q.classCode,
+      })
+    );
 
-    const response = Buffer.concat([header, question, answer]);
+    const answerBuffers = questions.map((q) =>
+      Answer.write({
+        name: q.name,
+        type: 1, // A record
+        classCode: 1, // IN class
+        ttl: 60,
+        rdlength: 4,
+        rdata: "8.8.8.8", // Example IP address for the answer
+      })
+    );
+
+    const response = Buffer.concat([header, ...questionBuffers, ...answerBuffers]);
 
     udpSocket.send(response, remoteAddr.port, remoteAddr.address, (err) => {
       if (err) {
@@ -99,6 +94,6 @@ udpSocket.on("message", (data: Buffer, remoteAddr: dgram.RemoteInfo) => {
       }
     });
   } catch (e) {
-    console.log(`Error sending data: ${e}`);
+    console.log(`Error processing request: ${e}`);
   }
 });

@@ -2,7 +2,8 @@ export enum OPCODE {
   QUERY = 0,
   IQUERY = 1,
   STATUS = 2,
-  NOT_IMPLEMENTED = 3,
+  RESERVED = 3,  // Add this new opcode
+  // ... other opcodes ...
 }
 
 export enum ResponseCode {
@@ -69,6 +70,7 @@ class Header {
 
     const qr = (flags >> 15) & 1;
     const opcode = (flags >> 11) & 0b1111;
+    
     const aa = (flags >> 10) & 1;
     const tc = (flags >> 9) & 1;
     const rd = (flags >> 8) & 1;
@@ -79,17 +81,17 @@ class Header {
     const header = {
       id,
       qr,
-      opcode: opcode as OPCODE,
+      opcode: opcode in OPCODE ? opcode as OPCODE : OPCODE.RESERVED,
       aa,
       tc,
       rd,
       ra,
       z,
-      rcode: opcode === 0 ? ResponseCode.NOERROR : ResponseCode.NOT_IMPLEMENTED,
-      qdcount: 1,
-      ancount: 1,
-      nscount: 0,
-      arcount: 0,
+      rcode: rcode as ResponseCode,
+      qdcount, // Use the actual qdcount from the request
+      ancount,
+      nscount,
+      arcount,
     };
 
     // console.log("Header returned from Header.write(): ", header);
