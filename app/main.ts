@@ -45,7 +45,7 @@ udpSocket.on("message", async (data: Buffer, remoteAddr: dgram.RemoteInfo) => {
   const header = Header.read(data);
   const questions: IDNSQuestion[] = [];
 
-  let offset = 12; // Start after the header
+  let offset = 12;
   for (let i = 0; i < header.qdcount; i++) {
     const { question, newOffset } = Question.read(data, offset);
     questions.push(question);
