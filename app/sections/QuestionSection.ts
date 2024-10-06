@@ -33,79 +33,97 @@ export interface IDNSQuestion {
 class Question {
   static write(values: IDNSQuestion) {
     const { name, type, classCode } = values;
+
     const labels = name.split(".");
+
     const nameBuffer = Buffer.concat(
       labels.map((label) => {
         const length = Buffer.from([label.length]);
         const labelBuffer = Buffer.from(label, "binary");
+
         return Buffer.concat([length, labelBuffer]);
       })
     );
+
     const nullByte = Buffer.from([0]);
     const typeBuffer = Buffer.alloc(2);
     typeBuffer.writeUInt16BE(type);
+
     const classBuffer = Buffer.alloc(2);
     classBuffer.writeUInt16BE(classCode);
+
     const question = Buffer.concat([
       nameBuffer,
       nullByte,
       typeBuffer,
       classBuffer,
     ]);
+
     console.log("Question Size: ", question.byteLength);
+
     return question;
   }
 
-  static decode(
-    data: Buffer,
-    offset: number
-  ): { name: string; byteLength: number } {
-    let currentOffset = offset;
-    let parts: string[] = [];
-    let jumped = false;
-    let jumpOffset = -1;
+  static read(data: Buffer, offset: number): { question: IDNSQuestion, newOffset: number } {
+    const { name, newOffset } = Question.decodeName(data, offset);
+    offset = newOffset;
+    const type = data.readUInt16BE(offset);
+    offset += 2;
+    const classCode = data.readUInt16BE(offset);
+    offset += 2;
 
-    while (data[currentOffset] !== 0) {
-      const length = data[currentOffset];
-
-      // Check for compression
-      if ((length & 0xc0) === 0xc0) {
-        if (!jumped) {
-          jumpOffset = currentOffset + 2;
-        }
-        currentOffset = ((length & 0x3f) << 8) | data[currentOffset + 1];
-        jumped = true;
-      } else {
-        currentOffset++;
-        const part = data
-          .subarray(currentOffset, currentOffset + length)
-          .toString("binary");
-        parts.push(part);
-        currentOffset += length;
-      }
-    }
-
-    if (!jumped) {
-      jumpOffset = currentOffset + 1;
-    }
-
-    const name = parts.join(".");
-    const byteLength = jumpOffset - offset + 4; // +4 for type and classCode
-    return { name, byteLength };
+    return {
+      question: { 
+        name, 
+        type: type as QuestionType, 
+        classCode: classCode as QuestionClass 
+      },
+      newOffset: offset
+    };
   }
 
-  static read(value: Buffer): IDNSQuestion {
-    const decoded = this.decode(value, 0);
-    const domainName = decoded.name;
-    let offset = decoded.byteLength - 4; // Subtract 4 to get the correct offset for type and classCode
-    const type = value.readUInt16BE(offset);
-    offset += 2;
-    const classCode = value.readUInt16BE(offset);
-    return {
-      name: domainName,
-      type: type,
-      classCode: classCode,
-    };
+  static decodeName(data: Buffer, offset: number): { name: string, newOffset: number } {
+    const parts: string[] = [];
+    const startOffset = offset;
+    
+    while (true) {
+      const length = data[offset];
+      if (length === 0) {
+        offset++;
+        break;
+      }
+      
+      if ((length & 0xc0) === 0xc0) {
+        const pointerOffset = ((length & 0x3f) << 8) | data[offset + 1];
+        const { name } = Question.decodeName(data, pointerOffset);
+        parts.push(name);
+        offset += 2;
+        break;
+      }
+      
+      offset++;
+      parts.push(data.slice(offset, offset + length).toString('ascii'));
+      offset += length;
+    }
+    
+    return { name: parts.join('.'), newOffset: offset };
+  }
+
+  static decode(data: Buffer): string {
+    let offset: number = 0;
+    let parts: string[] = [];
+
+    while (data[offset] !== 0) {
+      const length = data[offset];
+      offset++;
+
+      const part = data.subarray(offset, offset + length).toString("binary");
+      parts.push(part);
+
+      offset += length;
+    }
+
+    return parts.join(".");
   }
 }
 

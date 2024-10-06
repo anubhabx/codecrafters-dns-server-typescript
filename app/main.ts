@@ -1,16 +1,16 @@
 import * as dgram from "dgram";
-import Header, {
-  IDNSHeader,
-  OPCODE,
-  ResponseCode,
-} from "./sections/HeaderSection";
+import Header, { IDNSHeader, OPCODE, ResponseCode } from "./sections/HeaderSection";
 import Question, { IDNSQuestion } from "./sections/QuestionSection";
-import Answer, { INDSAnswer } from "./sections/AnswerSection";
-import { argv } from "process";
 
-function parseArgs(): { resolver: string; port: number } {
-  const args = argv.slice(2);
-  let result = { resolver: "", port: 53 };
+interface ServerConfig {
+  resolver: string;
+  port: number;
+}
+
+// Parse command line arguments
+function parseArgs(): ServerConfig {
+  const args = process.argv.slice(2);
+  const result: ServerConfig = { resolver: "", port: 53 };
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--resolver" && i + 1 < args.length) {
@@ -22,7 +22,7 @@ function parseArgs(): { resolver: string; port: number } {
   }
 
   if (!result.resolver) {
-    console.log("Error: --resolver argument is required.");
+    console.error("Error: --resolver argument is required");
     process.exit(1);
   }
 
@@ -30,120 +30,160 @@ function parseArgs(): { resolver: string; port: number } {
 }
 
 const { resolver, port } = parseArgs();
-console.log(`Using resolver ${resolver}:${port}`);
 
 const udpSocket: dgram.Socket = dgram.createSocket("udp4");
-udpSocket.bind(2053, "127.0.0.1");
+const forwardSocket: dgram.Socket = dgram.createSocket("udp4");
 
-function forwardDnsRequest(data: Buffer, remoteAddr: dgram.RemoteInfo) {
-  const forwardSocket = dgram.createSocket("udp4");
+udpSocket.on("listening", () => {
+  const address = udpSocket.address();
+  console.log(`DNS server listening on ${address.address}:${address.port}`);
+});
 
-  forwardSocket.send(data, port, resolver, (err) => {
-    if (err) {
-      console.error("Error forwarding request: ", err);
-      forwardSocket.close();
-      return;
+udpSocket.on("message", async (data: Buffer, remoteAddr: dgram.RemoteInfo) => {
+  console.log(`Received data from ${remoteAddr.address}:${remoteAddr.port}`);
+
+  const header = Header.read(data);
+  const questions: IDNSQuestion[] = [];
+
+  let offset = 12; // Start after the header
+  for (let i = 0; i < header.qdcount; i++) {
+    const { question, newOffset } = Question.read(data, offset);
+    questions.push(question);
+    offset = newOffset;
+  }
+
+  console.log(`Received ${questions.length} questions`);
+
+  if (header.opcode === OPCODE.IQUERY || header.opcode === OPCODE.STATUS || header.opcode > OPCODE.STATUS) {
+    // Handle IQUERY, STATUS, and unknown opcodes
+    const response = createErrorResponse(header, ResponseCode.NOT_IMPLEMENTED);
+    udpSocket.send(response, remoteAddr.port, remoteAddr.address, (err) => {
+      if (err) {
+        console.error("Error sending response:", err);
+      } else {
+        console.log("Response sent successfully.");
+      }
+    });
+    return;
+  }
+
+  const responses = await Promise.all(
+    questions.map((question) => forwardQuery(header.id, question))
+  );
+  const combinedResponse = combineResponses(header, questions, responses);
+
+  console.log("Combined response:", combinedResponse);
+
+  udpSocket.send(
+    combinedResponse,
+    remoteAddr.port,
+    remoteAddr.address,
+    (err) => {
+      if (err) {
+        console.error("Error sending response:", err);
+      } else {
+        console.log("Response sent successfully.");
+      }
     }
+  );
+});
 
-    forwardSocket.on("message", (msg) => {
-      udpSocket.send(msg, remoteAddr.port, remoteAddr.address, (err) => {
-        if (err) {
-          console.error("Error sending response:", err);
-        } else {
-          console.log("Response sent successfully.");
-        }
-        forwardSocket.close();
+function forwardQuery(
+  originalId: number,
+  question: IDNSQuestion
+): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const newHeader = Header.write({
+      id: originalId,
+      qr: 0,
+      opcode: 0,
+      aa: 0,
+      tc: 0,
+      rd: 1,
+      ra: 0,
+      z: 0,
+      rcode: 0,
+      qdcount: 1,
+      ancount: 0,
+      nscount: 0,
+      arcount: 0,
+    });
+
+    const newQuestion = Question.write(question);
+    const newQuery = Buffer.concat([newHeader, newQuestion]);
+
+    forwardSocket.send(newQuery, port, resolver, (err) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+
+      forwardSocket.once("message", (resolverResponse: Buffer) => {
+        console.log("Received response from resolver:", resolverResponse);
+        resolve(resolverResponse);
       });
     });
   });
-
-  forwardSocket.on("error", (err) => {
-    console.error("Forward Socket Error: ", err);
-    forwardSocket.close();
-  });
 }
 
-udpSocket.on("message", async (data: Buffer, remoteAddr: dgram.RemoteInfo) => {
-  try {
-    console.log(`Received data from ${remoteAddr.address}:${remoteAddr.port}`);
+function combineResponses(
+  originalHeader: IDNSHeader,
+  questions: IDNSQuestion[],
+  responses: Buffer[]
+): Buffer {
+  const totalAnswers = responses.reduce(
+    (sum, resp) => sum + Header.read(resp).ancount,
+    0
+  );
 
-    const parsedHeader = Header.read(data);
-    let offset = 12; // DNS header is 12 bytes
-    const questions = [];
-    for (let i = 0; i < parsedHeader.qdcount; i++) {
-      const { name, byteLength } = Question.decode(data, offset);
-      const type = data.readUInt16BE(offset + byteLength - 4);
-      const classCode = data.readUInt16BE(offset + byteLength - 2);
-      questions.push({ name, type, classCode, byteLength });
-      offset += byteLength;
-    }
+  const combinedHeader = Header.write({
+    ...originalHeader,
+    qr: 1, // This is a response
+    ancount: totalAnswers,
+  });
 
-    if (questions.length > 1) {
-      // Handle multiple questions by splitting them into separate requests
-      const responses: Buffer[] = [];
-      for (const question of questions) {
-        const singleQuestionHeader = {
-          ...parsedHeader,
-          qdcount: 1,
-          ancount: 0,
-          nscount: 0,
-          arcount: 0,
-        };
-        const singleQuestionData = Buffer.concat([
-          Header.write(singleQuestionHeader),
-          Question.write(question),
-        ]);
-        const responsePromise = new Promise<Buffer>((resolve) => {
-          const forwardSocket = dgram.createSocket("udp4");
-          forwardSocket.send(singleQuestionData, port, resolver, (err) => {
-            if (err) {
-              console.error("Error forwarding request: ", err);
-              forwardSocket.close();
-              resolve(Buffer.alloc(0));
-            }
-          });
-          forwardSocket.on("message", (msg) => {
-            forwardSocket.close();
-            resolve(msg);
-          });
-        });
-        responses.push(await responsePromise);
-        // Handle the response here
-      }
+  const questionSection = Buffer.concat(
+    questions.map((q) => Question.write(q))
+  );
 
-      // Merge responses
-      const mergedHeader = {
-        ...parsedHeader,
-        qr: 1,
-        ancount: responses.reduce(
-          (sum, resp) => sum + Header.read(resp).ancount,
-          0
-        ),
-      };
-      const mergedResponse = Buffer.concat([
-        Header.write(mergedHeader),
-        ...responses.map((resp) => resp.subarray(12)), // Remove headers from individual responses
-      ]);
+  const answerSections = Buffer.concat(
+    responses.map((resp) => {
+      const respHeader = Header.read(resp);
+      // Skip the header and question section in the response
+      const questionEnd = resp.indexOf('\0', 12) + 5;
+      return resp.subarray(questionEnd);
+    })
+  );
 
-      udpSocket.send(
-        mergedResponse,
-        remoteAddr.port,
-        remoteAddr.address,
-        (err) => {
-          if (err) {
-            console.error("Error sending merged response:", err);
-          } else {
-            console.log("Merged response sent successfully.");
-          }
-        }
-      );
-    } else {
-      // Forward single question request
-      forwardDnsRequest(data, remoteAddr);
-    }
-  } catch (e) {
-    console.log(`Error processing request: ${e}`);
-  }
+  const combinedResponse = Buffer.concat([combinedHeader, questionSection, answerSections]);
+  console.log("Combined response length:", combinedResponse.length);
+  return combinedResponse;
+}
+
+udpSocket.on("error", (err) => {
+  console.error(`Server error:\n${err.stack}`);
+  udpSocket.close();
 });
 
-console.log("DNS server is running on 127.0.0.1:2053");
+udpSocket.bind(2053, "127.0.0.1");
+
+// Keep the process running
+process.on("SIGINT", () => {
+  console.log("Shutting down server...");
+  udpSocket.close();
+  forwardSocket.close();
+  process.exit(0);
+});
+
+function createErrorResponse(originalHeader: IDNSHeader, rcode: ResponseCode): Buffer {
+  const responseHeader = Header.write({
+    ...originalHeader,
+    qr: 1, // This is a response
+    rcode: rcode,
+    ancount: 0,
+    nscount: 0,
+    arcount: 0,
+  });
+
+  return responseHeader;
+}
